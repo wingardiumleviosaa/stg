@@ -1,0 +1,106 @@
+doris:
+  dorisCluster:
+    enabledCn: false
+    enabledBroker: false
+  feSpec:
+    replicas: 3
+    image:
+      repository: selectdb/doris.fe-ubuntu
+      tag: 2.0.3
+    service:
+      type: NodePort
+      servicePorts:
+      - nodePort: 30001
+        targetPort: 9030
+      - nodePort: 30002
+        targetPort: 8030
+
+    configMap:
+      fe.conf: |
+        LOG_DIR = /opt/apache-doris/fe/log
+        JAVA_OPTS = "-Xss4m -Xmx8192m -XX:+UseMembar -XX:SurvivorRatio=8 -XX:MaxTenuringThreshold=7 -XX:+PrintGCDateStamps -XX:+PrintGCDetails -XX:+UseConcMarkSweepGC -XX:+UseParNewGC -XX:+CMSClassUnloadingEnabled -XX:-CMSParallelRemarkEnabled -XX:CMSInitiatingOccupancyFraction=80 -XX:SoftRefLRUPolicyMSPerMB=0 -Xloggc:/opt/apache-doris/fe/log/fe.gc.log.$CUR_DATE"
+        meta_dir = /opt/apache-doris/fe/doris-meta
+        http_port = 8030
+        rpc_port = 9020
+        query_port = 9030
+        edit_log_port = 9010
+        arrow_flight_sql_port = -1
+        sys_log_level = INFO
+        sys_log_mode = NORMAL
+        enable_fqdn_mode = true
+
+    resource: 
+      requests:
+        cpu: 2
+        memory: 4Gi
+      limits:
+        cpu: 8
+        memory: 16Gi
+
+    persistentVolumeClaim:
+      metaPersistentVolume:
+        storage: 200Gi
+        storageClassName: "ceph-block"
+      logsPersistentVolume:
+        storage: 100Gi
+        storageClassName: "ceph-block"
+
+  beSpec:
+    replicas: 3
+    image:
+      repository: selectdb/doris.be-ubuntu
+      tag: 2.0.3
+    service:
+      type: NodePort
+      servicePorts:
+      - nodePort: 30003
+        targetPort: 9040
+      - nodePort: 30004
+        targetPort: 8040
+    configMap: 
+      be.conf: |
+        LOG_DIR = /opt/apache-doris/be/log
+        JAVA_OPTS= "-Xmx1024m -DlogPath=/opt/apache-doris/be/log/jni.log -Xloggc:/opt/apache-doris/be/log/be.gc.log.$CUR_DATE -Dsun.java.command=DorisBE -XX:-CriticalJNINatives -DJDBC_MIN_POOL=1 -DJDBC_MAX_POOL=100 -DJDBC_MAX_IDLE_TIME=300000 -DJDBC_MAX_WAIT_TIME=5000"
+        JEMALLOC_CONF = "percpu_arena:percpu,background_thread:true,metadata_thp:auto,muzzy_decay_ms:15000,dirty_decay_ms:15000,oversize_threshold:0,lg_tcache_max:20,prof:false,lg_prof_interval:32,lg_prof_sample:19,prof_gdump:false,prof_accum:false,prof_leak:false,prof_final:false"
+        JEMALLOC_PROF_PRFIX=""
+        be_port = 9060
+        webserver_port = 8040
+        heartbeat_service_port = 9050
+        brpc_port = 8060
+        arrow_flight_sql_port = -1
+        storage_root_path = /opt/apache-doris/be/storage
+        sys_log_level = INFO
+        aws_log_level=0
+        AWS_EC2_METADATA_DISABLED=true
+        enable_fqdn_mode = true
+        enable_https = false
+        enable_auth = false
+
+    resource:
+      requests:
+        cpu: 2
+        memory: 4Gi
+      limits:
+        cpu: 8
+        memory: 16Gi
+
+    persistentVolumeClaim:
+      dataPersistentVolume:
+        storage: 200Gi
+        storageClassName: "ceph-block"
+      logsPersistentVolume:
+        storage: 100Gi
+        storageClassName: "ceph-block"
+
+ingress:
+  name: doris
+  host: doris.sdsp-stg.com
+  service:
+    name: doriscluster-helm-fe-service
+    port: http-port
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/affinity: cookie
+    nginx.ingress.kubernetes.io/affinity-mode: persistent
+    nginx.ingress.kubernetes.io/session-cookie-name: doris-fe

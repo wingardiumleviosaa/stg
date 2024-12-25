@@ -1,0 +1,169 @@
+
+configmapName: initdb
+
+secrets:
+  openmetadataMysqlPassword: openmetadata_password
+  airflowPassword: admin
+  airflowMysqlPassword: airflow_pass
+
+
+mysql:
+  enabled: true
+  fullnameOverride: "mysql"
+  architecture: standalone
+  image:
+    pullPolicy: "Always"
+    debug: true
+  auth:
+    rootPassword: "!QAZxsw2"
+    createDatabase: false
+  initdbScriptsConfigMap: initdb
+  primary:
+    extraFlags: "--sort_buffer_size=10M"
+    persistence:
+      storageClass: "ceph-block"
+      size: 50Gi
+    service:
+      type: NodePort
+    livenessProbe:
+      enabled: false
+    readinessProbe:
+      enabled: false
+    startupProbe:
+      enabled: false
+  secondary:
+    replicaCount: 0
+  volumePermissions:
+    enabled: true
+
+# OpenSearch Helm Dependency
+# you can find more details about this here https://artifacthub.io/packages/helm/opensearch-project-helm-charts/opensearch/2.12.2
+opensearch:
+  enabled: true
+  clusterName: opensearch
+  fullnameOverride: opensearch
+  nodeGroup: ""
+  imagePullPolicy: Always
+  opensearchJavaOpts: "-Xmx1g -Xms1g"
+  persistence:
+    storageClass: "ceph-block"
+    size: 30Gi
+  protocol: http
+  config:
+    opensearch.yml: |
+      plugins.security.disabled: true
+  singleNode: true
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256M"
+    limits:
+      cpu: "2000m"
+      memory: "2048M"
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    path: /
+    hosts:
+      - opensearch.sdsp-stg.com
+    tls:
+      - hosts:
+          - opensearch.sdsp-stg.com
+    
+
+# Airflow configurations for helm dependency
+# you can find more details about this here https://github.com/airflow-helm/charts
+airflow:
+  enabled: true
+  airflow:
+    image:
+      repository: harbor.sdsp-stg.com/base/airflow
+      tag: latest
+      pullPolicy: "Always"
+    executor: "KubernetesExecutor"
+    config:
+      # This is required for OpenMetadata UI to fetch status of DAGs
+      AIRFLOW__API__AUTH_BACKENDS: "airflow.api.auth.backend.session,airflow.api.auth.backend.basic_auth"
+      # OpenMetadata Airflow Apis Plugin DAGs Configuration
+      AIRFLOW__OPENMETADATA_AIRFLOW_APIS__DAG_GENERATED_CONFIGS: "/opt/airflow/dags"
+      # OpenMetadata Airflow Secrets Manager Configuration
+      AIRFLOW__OPENMETADATA_SECRETS_MANAGER__AWS_REGION: ""
+      AIRFLOW__OPENMETADATA_SECRETS_MANAGER__AWS_ACCESS_KEY_ID: ""
+      AIRFLOW__OPENMETADATA_SECRETS_MANAGER__AWS_ACCESS_KEY: ""
+    users:
+    - username: admin
+      password: admin
+      role: Admin
+      email: asus.sdsp@gmail.com
+      firstName: admin
+      lastName: admin
+  web:
+    readinessProbe:
+      enabled: true
+      initialDelaySeconds: 60
+      periodSeconds: 30
+      timeoutSeconds: 30
+      failureThreshold: 10
+    livenessProbe:
+      enabled: true
+      initialDelaySeconds: 60
+      periodSeconds: 30
+      timeoutSeconds: 30
+      failureThreshold: 10
+  postgresql:
+    enabled: false
+  workers:
+    enabled: false
+  flower:
+    enabled: false
+  redis:
+    enabled: false
+  externalDatabase:
+    type: mysql
+    host: mysql
+    port: 3306
+    database: airflow_db
+    user: airflow_user
+    passwordSecret: airflow-mysql-secrets
+    passwordSecretKey: airflow-mysql-password
+  serviceAccount:
+    create: true
+    name: "airflow"
+  scheduler:
+    logCleanup:
+      enabled: false
+  dags:
+    persistence:
+      enabled: true
+      storageClass: "ceph-filesystem"
+      size: 100Gi
+      accessMode: ReadWriteMany
+  logs:
+    persistence:
+      enabled: true
+      storageClass: "ceph-filesystem"
+      accessMode: ReadWriteMany
+      size: 100Gi
+  ingress:
+    enabled: true
+    apiVersion: networking.k8s.io/v1
+    web:
+      path: ""
+      host: "airflow.sdsp-stg.com"
+      ingressClassName: "nginx"
+      tls:
+        enabled: true
+
+openmetadata:
+  ingress:
+    enabled: true
+    className: nginx
+    annotations: {}
+    hosts:
+      - host: openmetadata.sdsp-stg.com
+        paths:
+          - path: /
+            pathType: ImplementationSpecific
+    tls:
+      - hosts:
+          - openmetadata.sdsp-stg.com

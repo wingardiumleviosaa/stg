@@ -1,0 +1,74 @@
+kube-prometheus-stack:
+  defaultRules:
+    create: true
+    additionalRuleLabels:
+      environment: Staging
+
+  prometheus:
+    ingress:
+      enabled: true
+      ingressClassName: nginx
+      hosts:
+        - prometheus.sdsp-stg.com
+      paths: ["/"]
+      tls:
+        - hosts:
+            - prometheus.sdsp-stg.com
+
+    prometheusSpec:
+    scrapeConfigSelector:
+      matchLabels:
+        prometheus: system-monitoring-prometheus
+
+  alertmanager:
+    config:
+      global:
+        resolve_timeout: 5m
+      route:
+        group_by: ['namespace']
+        group_wait: 3s
+        group_interval: 5m
+        repeat_interval: 10m
+        receiver: 'null'
+        routes:
+        - receiver: 'null'
+          matchers:
+            - 'alertname = Watchdog'
+        - receiver: 'null'
+          matchers:
+            - 'alertname = InfoInhibitor'
+        - receiver: 'critical-warn-receiver'
+          matchers:
+            - 'severity =~ critical|warning'
+      receivers:
+      - name: 'null'
+      - name: 'critical-warn-receiver'
+        msteams_configs:
+          - webhook_url: 'https://prod2-18.southeastasia.logic.azure.com:443/workflows/a58e68453dbc4536be0ca2cde85aa035/triggers/manual/paths/invoke?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=V_FlwzPby7XudEAzKeKGjhWHpdhs6jDZnuZvoLW-DEk'
+        webhook_configs:
+          - url: 'http://172.22.51.210:8099/api/webhooks/prometheus?api-key=OaksgBaMMIPDsp9XZEm6X-qel7ZwQAuxs2jYZQee'
+            send_resolved: true
+      templates:
+      - '/etc/alertmanager/config/*.tmpl'
+
+    ingress:
+      enabled: true
+      ingressClassName: nginx
+      hosts:
+        - alertmanager.sdsp-stg.com
+      paths: ["/"]
+      tls:
+        - hosts:
+            - alertmanager.sdsp-stg.com
+
+  grafana:
+    adminPassword: "!QAZxsw2"
+    ingress:
+      enabled: true
+      ingressClassName: nginx
+      hosts:
+        - grafana.sdsp-stg.com
+      paths: ["/"]
+      tls:
+        - hosts:
+            - grafana.sdsp-stg.com

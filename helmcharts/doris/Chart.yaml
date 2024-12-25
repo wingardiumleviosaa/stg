@@ -1,0 +1,15 @@
+apiVersion: v2
+name: doris
+description: Apache Doris is an easy-to-use, high-performance and real-time analytical database based on MPP architecture, known for its extreme speed and ease of use.
+icon: https://charts.selectdb.com/images/doris.jpg
+type: application
+version: 24.0.0-beta
+appVersion: "2.1.2"
+kubeVersion: ">= 1.19"
+dependencies:
+- name: doris-operator
+  version: 24.0.0-beta
+  repository: https://charts.selectdb.com
+- name: doris
+  version: 24.0.0-beta
+  repository: https://charts.selectdb.com

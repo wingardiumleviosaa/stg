@@ -1,0 +1,33 @@
+cert-manager:
+  crds:
+    enabled: true
+  extraArgs: 
+    - --dns01-recursive-nameservers-only
+    - --dns01-recursive-nameservers=kube-dns.kube-system.svc.cluster.local:53
+
+cloudflareSecret:
+  name: cloudflare-api-token
+  apiTokenKey: api-token
+  apiToken: "-KUuuVZyLP5Rdp7_SebkgZSvjJE3nUTpcsOg2J-M"
+
+clusterIssuer:
+  name: letsencrypt-prd
+  acme:
+    email: "asus.sdsp@gmail.com"
+    server: "https://acme-v02.api.letsencrypt.org/directory"
+    privateKeySecretName: letsencrypt-prd
+    dnsZones:
+      - "sdsp-stg.com"
+      - "*.sdsp-stg.com"
+    cloudflare:
+      email: "asus.sdsp@gmail.com"
+
+certificate:
+  name: wildcard-sdsp-stg-prd
+  dnsNames:
+    - "sdsp-stg.com"
+    - "*.sdsp-stg.com"
+  issuerRef:
+    kind: ClusterIssuer
+    name: letsencrypt-prd
+  secretName: wildcard-sdsp-stg-prd

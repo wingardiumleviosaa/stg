@@ -1,0 +1,161 @@
+loki:
+  loki:
+    auth_enabled: false
+    schemaConfig:
+      configs:
+        - from: 2024-04-01
+          store: tsdb
+          object_store: s3
+          schema: v13
+          index:
+            prefix: loki_index_
+            period: 24h
+    compactor:
+      working_directory: /var/loki/compactor
+      compaction_interval: 10m
+      retention_enabled: true
+      retention_delete_delay: 2h
+      retention_delete_worker_count: 150
+      delete_request_store: s3
+    ingester:
+      chunk_encoding: snappy
+    tracing:
+      enabled: true
+    querier:
+      max_concurrent: 4
+
+    storage:
+      type: s3
+      bucketNames:
+        chunks: "chunks"
+        ruler: "ruler"
+        admin: "admin"
+      s3:
+        s3: s3://loki
+        endpoint: https://s3.sdsp-stg.com/loki
+        region: us-east-1
+        secretAccessKey: YmNu6mXhOzPKsDyHCRkgKp5T8YcRIRnZ3PjXuJS9
+        accessKeyId: I8B6JTW665Z3C28413F0
+        signatureVersion: v4
+        s3ForcePathStyle: true
+        insecure: false
+        http_config: {}
+
+  gateway:
+    nginxConfig:
+      file: |
+        {{- include "loki.nginxFile" . | replace "listen             [::]:8080;" "" | indent 2 -}}
+      serverSnippet: |
+        location = /stub_status {
+          stub_status on;
+          allow 127.0.0.1;
+          deny all;
+        }
+        location = /metrics {
+          proxy_pass       http://127.0.0.1:9113/metrics;
+        }
+    extraContainers:
+      - name: nginx-exporter
+        securityContext:
+          allowPrivilegeEscalation: false
+        image: nginx/nginx-prometheus-exporter:1.3.0
+        imagePullPolicy: IfNotPresent
+        ports:
+          - containerPort: 9113
+            name: http-exporter
+        resources:
+          limits:
+            memory: 128Mi
+            cpu: 500m
+          requests:
+            memory: 64Mi
+            cpu: 100m
+
+  deploymentMode: SimpleScalable
+
+  backend:
+    replicas: 3
+  read:
+    replicas: 3
+  write:
+    replicas: 3
+
+  # Disable minio storage
+  minio:
+    enabled: false
+
+  # Zero out replica counts of other deployment modes
+  singleBinary:
+    replicas: 0
+
+  ingester:
+    replicas: 0
+  querier:
+    replicas: 0
+  queryFrontend:
+    replicas: 0
+  queryScheduler:
+    replicas: 0
+  distributor:
+    replicas: 0
+  compactor:
+    replicas: 0
+  indexGateway:
+    replicas: 0
+  bloomCompactor:
+    replicas: 0
+  bloomGateway:
+    replicas: 0
+
+promtail:
+  config:
+    clients:
+      - url: http://loki-gateway/loki/api/v1/push
+    
+    snippets:
+      extraScrapeConfigs: |
+        - job_name: journal
+          journal:
+            json: false
+            max_age: 12h
+            path: /var/log/journal
+            matches: _SYSTEMD_UNIT=kubelet.service _SYSTEMD_UNIT=containerd.service
+            labels:
+              job: systemd-journal
+          relabel_configs:
+            - source_labels: ['__journal__systemd_unit']
+              target_label: 'unit'
+            - source_labels: ['__journal__hostname']
+              target_label: 'hostname'
+
+  extraVolumes:
+    - name: journal
+      hostPath:
+        path: /var/log/journal
+
+  extraVolumeMounts:
+    - name: journal
+      mountPath: /var/log/journal
+      readOnly: true
+
+kubernetes-event-exporter:
+  nameOverride: "event-exporter"
+  config:
+    logLevel: debug
+    logFormat: pretty
+    receivers:
+      - name: "dump"
+        file:
+          path: "/dev/stdout"
+          layout: {}
+      - name: "loki"
+        loki:
+          url: "http://loki-gateway/loki/api/v1/push"
+          streamLabels:
+            source: kubernetes-event-exporter
+            container: kubernetes-event-exporter
+    route:
+      routes:
+        - match:
+            - receiver: "dump"
+            - receiver: "loki"

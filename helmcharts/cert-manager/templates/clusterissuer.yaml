@@ -1,0 +1,33 @@
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Values.cloudflareSecret.name }}
+type: Opaque
+stringData:
+  {{ .Values.cloudflareSecret.apiTokenKey }}: {{ .Values.cloudflareSecret.apiToken }}
+
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: {{ .Values.clusterIssuer.name }}
+  namespace: {{ .Values.clusterIssuer.namespace }}
+spec:
+  acme:
+    email: {{ .Values.clusterIssuer.acme.email }}
+    server: {{ .Values.clusterIssuer.acme.server }}
+    privateKeySecretRef:
+      name: {{ .Values.clusterIssuer.acme.privateKeySecretName }}
+    solvers:
+    - selector:
+        dnsZones:
+          {{- range .Values.clusterIssuer.acme.dnsZones }}
+          - "{{ . }}"
+          {{- end }}
+      dns01:
+        cloudflare:
+          email: {{ .Values.clusterIssuer.acme.cloudflare.email }}
+          apiTokenSecretRef:
+            name: {{ .Values.cloudflareSecret.name }}
+            key: {{ .Values.cloudflareSecret.apiTokenKey }}

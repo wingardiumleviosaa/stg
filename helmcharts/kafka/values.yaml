@@ -1,0 +1,82 @@
+kafka-ui:
+  yamlApplicationConfig:
+    kafka:
+      clusters:
+        - name: stg
+          bootstrapServers:  my-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092
+    auth:
+      type: LOGIN_FORM
+    spring:
+      security:
+        user:
+          name: admin
+          password: "!QAZxsw2"
+    management:
+      health:
+        ldap:
+          enabled: false
+
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    path: "/"
+    pathType: Prefix
+    host: kafka-ui.sdsp-stg.com
+    tls:
+      enabled: true
+
+strimzi-kafka-operator:
+  extraEnvs:
+    - name: STRIMZI_LABELS_EXCLUSION_PATTERN
+      value: "argocd.argoproj.io/instance"
+
+clusterName: my-cluster
+
+kafka:
+  version: "3.8.0"
+  metadataVersion: "3.8"
+  replication:
+    offsetsTopicFactor: 1
+    transactionStateLogFactor: 3
+    transactionStateLogMinIsr: 2
+    defaultReplicationFactor: 3
+    minInsyncReplicas: 2
+  logRetention:
+    hours: 2160
+    bytes: -1
+  listeners:
+    - name: plain
+      port: 9092
+      type: internal
+      tls: false
+    - name: external
+      port: 9094
+      type: nodeport
+      tls: false
+      configuration:
+        bootstrap:
+          nodePort: 32100
+        brokers:
+          - broker: 0
+            advertisedHost: kafka.sdsp-stg.com
+            advertisedPort: 8091
+          - broker: 1
+            advertisedHost: kafka.sdsp-stg.com
+            advertisedPort: 8092
+          - broker: 2
+            advertisedHost: kafka.sdsp-stg.com
+            advertisedPort: 8093
+
+controllerNodePool:
+  replicas: 3
+  storage:
+    size: "100Gi"
+    deleteClaim: true
+    class: ceph-block
+
+brokerNodePool:
+  replicas: 3
+  storage:
+    size: "200Gi"
+    deleteClaim: true
+    class: ceph-block

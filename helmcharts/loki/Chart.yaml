@@ -1,0 +1,18 @@
+apiVersion: v2
+name: loki
+version: 6.12.0
+appVersion: v3.1.1
+description: Helm chart for Grafana Loki and Grafana Enterprise Logs supporting both simple, scalable and distributed modes.
+type: application
+home: https://grafana.github.io/helm-charts
+icon: https://grafana.com/docs/loki/latest/logo_and_name.png
+dependencies:
+  - name: loki
+    version: 6.12.0
+    repository: https://grafana.github.io/helm-charts
+  - name: promtail
+    version: 6.16.5
+    repository: https://grafana.github.io/helm-charts
+  - name: kubernetes-event-exporter
+    version: 3.2.12
+    repository: https://charts.bitnami.com/bitnami
